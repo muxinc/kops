@@ -96,8 +96,10 @@ func (_ *InstanceGroupManager) RenderGCE(t *gce.GCEAPITarget, a, e, changes *Ins
 		Name:             *e.Name,
 		Zone:             *e.Zone,
 		BaseInstanceName: *e.BaseInstanceName,
-		TargetSize:       *e.TargetSize,
 		InstanceTemplate: instanceTemplateURL,
+	}
+	if e.TargetSize != nil {
+		i.TargetSize = *e.TargetSize
 	}
 
 	for _, targetPool := range e.TargetPools {

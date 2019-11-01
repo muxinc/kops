@@ -39,6 +39,8 @@ type AutoscalingGroupModelBuilder struct {
 
 var _ fi.ModelBuilder = &AutoscalingGroupModelBuilder{}
 
+const preemptLabelKey = "cloud.mux.io/preemptible-node"
+
 func (b *AutoscalingGroupModelBuilder) Build(c *fi.ModelBuilderContext) error {
 	for _, ig := range b.InstanceGroups {
 		name := b.SafeObjectName(ig.ObjectMeta.Name)
@@ -77,7 +79,6 @@ func (b *AutoscalingGroupModelBuilder) Build(c *fi.ModelBuilderContext) error {
 
 				CanIPForward: fi.Bool(true),
 
-				// TODO: Support preemptible nodes?
 				Preemptible: fi.Bool(false),
 
 				Scopes: []string{
@@ -92,6 +93,10 @@ func (b *AutoscalingGroupModelBuilder) Build(c *fi.ModelBuilderContext) error {
 					//"config": resources/config.yaml $nodeset.Name
 					"cluster-name": fi.WrapResource(fi.NewStringResource(b.ClusterName())),
 				},
+			}
+
+			if _, ok := ig.Spec.NodeLabels[preemptLabelKey]; ok {
+				t.Preemptible = fi.Bool(true)
 			}
 
 			switch ig.Spec.Role {
@@ -164,9 +169,11 @@ func (b *AutoscalingGroupModelBuilder) Build(c *fi.ModelBuilderContext) error {
 				Name:             s(name),
 				Lifecycle:        b.Lifecycle,
 				Zone:             s(zone),
-				TargetSize:       fi.Int64(int64(targetSize)),
 				BaseInstanceName: s(ig.ObjectMeta.Name),
 				InstanceTemplate: instanceTemplate,
+			}
+			if minSize != 0 {
+				t.TargetSize = fi.Int64(int64(targetSize))
 			}
 
 			// Attach masters to load balancer if we're using one
