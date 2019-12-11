@@ -60,8 +60,9 @@ type InstanceTemplate struct {
 
 	Scopes []string
 
-	Metadata    map[string]*fi.ResourceHolder
-	MachineType *string
+	Metadata       map[string]*fi.ResourceHolder
+	MachineType    *string
+	MinCPUPlatform string
 
 	// ID is the actual name
 	ID *string
@@ -106,6 +107,7 @@ func (e *InstanceTemplate) Find(c *fi.Context) (*InstanceTemplate, error) {
 			actual.Tags = append(actual.Tags, tag)
 		}
 		actual.MachineType = fi.String(lastComponent(p.MachineType))
+		actual.MinCPUPlatform = p.MinCpuPlatform
 		actual.CanIPForward = &p.CanIpForward
 
 		bootDiskImage, err := ShortenImageURL(cloud.Project(), p.Disks[0].InitializeParams.SourceImage)
@@ -284,7 +286,8 @@ func (e *InstanceTemplate) mapToGCE(project string) (*compute.InstanceTemplate, 
 
 			Disks: disks,
 
-			MachineType: *e.MachineType,
+			MachineType:    *e.MachineType,
+			MinCpuPlatform: e.MinCPUPlatform,
 
 			Metadata: &compute.Metadata{
 				Kind:  "compute#metadata",

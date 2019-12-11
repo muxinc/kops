@@ -39,7 +39,10 @@ type AutoscalingGroupModelBuilder struct {
 
 var _ fi.ModelBuilder = &AutoscalingGroupModelBuilder{}
 
-const preemptLabelKey = "cloud.mux.io/preemptible-node"
+const (
+	preemptLabelKey   = "gcp.cloud.mux.io/preemptible-node"
+	minCPUPlatformKey = "gcp.cloud.mux.io/min-cpu-platform"
+)
 
 func (b *AutoscalingGroupModelBuilder) Build(c *fi.ModelBuilderContext) error {
 	for _, ig := range b.InstanceGroups {
@@ -97,6 +100,9 @@ func (b *AutoscalingGroupModelBuilder) Build(c *fi.ModelBuilderContext) error {
 
 			if _, ok := ig.Spec.NodeLabels[preemptLabelKey]; ok {
 				t.Preemptible = fi.Bool(true)
+			}
+			if v, ok := ig.Spec.NodeLabels[minCPUPlatformKey]; ok {
+				t.MinCPUPlatform = v
 			}
 
 			switch ig.Spec.Role {
