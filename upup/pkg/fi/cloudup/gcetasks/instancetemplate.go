@@ -55,13 +55,16 @@ type InstanceTemplate struct {
 	BootDiskSizeGB *int64
 	BootDiskType   *string
 
+	LocalSSDs *int32
+
 	CanIPForward *bool
 	Subnet       *Subnet
 
 	Scopes []string
 
-	Metadata    map[string]*fi.ResourceHolder
-	MachineType *string
+	Metadata       map[string]*fi.ResourceHolder
+	MachineType    *string
+	MinCPUPlatform string
 
 	// ID is the actual name
 	ID *string
@@ -106,6 +109,7 @@ func (e *InstanceTemplate) Find(c *fi.Context) (*InstanceTemplate, error) {
 			actual.Tags = append(actual.Tags, tag)
 		}
 		actual.MachineType = fi.String(lastComponent(p.MachineType))
+		actual.MinCPUPlatform = p.MinCpuPlatform
 		actual.CanIPForward = &p.CanIpForward
 
 		bootDiskImage, err := ShortenImageURL(cloud.Project(), p.Disks[0].InitializeParams.SourceImage)
@@ -211,8 +215,6 @@ func (e *InstanceTemplate) mapToGCE(project string) (*compute.InstanceTemplate, 
 		}
 	}
 
-	glog.Infof("We should be using NVME for GCE")
-
 	var disks []*compute.AttachedDisk
 	disks = append(disks, &compute.AttachedDisk{
 		Kind: "compute#attachedDisk",
@@ -228,6 +230,22 @@ func (e *InstanceTemplate) mapToGCE(project string) (*compute.InstanceTemplate, 
 		Mode:       "READ_WRITE",
 		Type:       "PERSISTENT",
 	})
+
+	if ssdNum := int(fi.Int32Value(e.LocalSSDs)); ssdNum != 0 {
+		for i := 1; i <= ssdNum; i++ {
+			disks = append(disks, &compute.AttachedDisk{
+				Kind: "compute#attachedDisk",
+				InitializeParams: &compute.AttachedDiskInitializeParams{
+					DiskType: "local-ssd",
+				},
+				Index:      int64(i),
+				Interface:  "NVME",
+				AutoDelete: true,
+				Mode:       "READ_WRITE",
+				Type:       "SCRATCH",
+			})
+		}
+	}
 
 	var tags *compute.Tags
 	if e.Tags != nil {
@@ -284,7 +302,8 @@ func (e *InstanceTemplate) mapToGCE(project string) (*compute.InstanceTemplate, 
 
 			Disks: disks,
 
-			MachineType: *e.MachineType,
+			MachineType:    *e.MachineType,
+			MinCpuPlatform: e.MinCPUPlatform,
 
 			Metadata: &compute.Metadata{
 				Kind:  "compute#metadata",

@@ -17,6 +17,10 @@ limitations under the License.
 package gcemodel
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"k8s.io/kops/pkg/apis/kops"
 	"k8s.io/kops/pkg/model"
 	"k8s.io/kops/pkg/model/defaults"
@@ -39,7 +43,14 @@ type AutoscalingGroupModelBuilder struct {
 
 var _ fi.ModelBuilder = &AutoscalingGroupModelBuilder{}
 
-const preemptLabelKey = "cloud.mux.io/preemptible-node"
+const (
+	preemptLabelKey   = "gcp.cloud.mux.io/preemptible-node"
+	minCPUPlatformKey = "gcp.cloud.mux.io/min-cpu-platform"
+	localSSDsKey      = "gcp.cloud.mux.io/local-ssds"
+
+	// DEPRECATED(dilyevsky): Support old label until migrated
+	preemptLabelKeyDeprecated = "cloud.mux.io/preemptible-node"
+)
 
 func (b *AutoscalingGroupModelBuilder) Build(c *fi.ModelBuilderContext) error {
 	for _, ig := range b.InstanceGroups {
@@ -97,6 +108,22 @@ func (b *AutoscalingGroupModelBuilder) Build(c *fi.ModelBuilderContext) error {
 
 			if _, ok := ig.Spec.NodeLabels[preemptLabelKey]; ok {
 				t.Preemptible = fi.Bool(true)
+			}
+			if _, ok := ig.Spec.NodeLabels[preemptLabelKeyDeprecated]; ok {
+				t.Preemptible = fi.Bool(true)
+			}
+			if v, ok := ig.Spec.NodeLabels[minCPUPlatformKey]; ok {
+				t.MinCPUPlatform = strings.ReplaceAll(v, "-", " ")
+			}
+			if v, ok := ig.Spec.NodeLabels[localSSDsKey]; ok {
+				i, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("could not convert label %q to int: %v", v, err)
+				}
+
+				if i != 0 {
+					t.LocalSSDs = i32(int32(i))
+				}
 			}
 
 			switch ig.Spec.Role {
