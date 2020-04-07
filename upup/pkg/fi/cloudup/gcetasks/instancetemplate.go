@@ -55,6 +55,8 @@ type InstanceTemplate struct {
 	BootDiskSizeGB *int64
 	BootDiskType   *string
 
+	LocalSSDs *int32
+
 	CanIPForward *bool
 	Subnet       *Subnet
 
@@ -213,8 +215,6 @@ func (e *InstanceTemplate) mapToGCE(project string) (*compute.InstanceTemplate, 
 		}
 	}
 
-	glog.Infof("We should be using NVME for GCE")
-
 	var disks []*compute.AttachedDisk
 	disks = append(disks, &compute.AttachedDisk{
 		Kind: "compute#attachedDisk",
@@ -230,6 +230,22 @@ func (e *InstanceTemplate) mapToGCE(project string) (*compute.InstanceTemplate, 
 		Mode:       "READ_WRITE",
 		Type:       "PERSISTENT",
 	})
+
+	if ssdNum := int(fi.Int32Value(e.LocalSSDs)); ssdNum != 0 {
+		for i := 1; i <= ssdNum; i++ {
+			disks = append(disks, &compute.AttachedDisk{
+				Kind: "compute#attachedDisk",
+				InitializeParams: &compute.AttachedDiskInitializeParams{
+					DiskType: "local-ssd",
+				},
+				Index:      int64(i),
+				Interface:  "NVME",
+				AutoDelete: true,
+				Mode:       "READ_WRITE",
+				Type:       "SCRATCH",
+			})
+		}
+	}
 
 	var tags *compute.Tags
 	if e.Tags != nil {
