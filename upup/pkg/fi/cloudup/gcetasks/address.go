@@ -34,6 +34,12 @@ type Address struct {
 	IPAddress *string
 }
 
+var _ fi.CompareWithID = &ForwardingRule{}
+
+func (e *Address) CompareWithID() *string {
+	return e.Name
+}
+
 func (e *Address) Find(c *fi.Context) (*Address, error) {
 	actual, err := e.find(c.Cloud.(gce.GCECloud))
 	if actual != nil && err == nil {
